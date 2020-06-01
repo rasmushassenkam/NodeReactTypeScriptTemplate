@@ -1,5 +1,5 @@
 {
-  "name": "nodetypesscripttemplate",
+  "name": "nodereacttypesscripttemplate",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -10,14 +10,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rasmushassenkam/NodeTypeScriptTemplate.git"
+    "url": "git+https://github.com/rasmushassenkam/NodeReactTypeScriptTemplate.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/rasmushassenkam/NodeTypeScriptTemplate/issues"
+    "url": "https://github.com/rasmushassenkam/NodeReactTypeScriptTemplate/issues"
   },
-  "homepage": "https://github.com/rasmushassenkam/NodeTypeScriptTemplate#readme",
+  "homepage": "https://github.com/rasmushassenkam/NodeReactTypeScriptTemplate#readme",
   "dependencies": {
     "@types/mongoose": "^5.7.13",
     "bcryptjs": "^2.4.3",
