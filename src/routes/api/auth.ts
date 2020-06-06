@@ -8,6 +8,8 @@ import { constants } from "../../config/constants";
 import { IUserResponse } from "../../interfaces/IUserResponse";
 import { IUser } from "../../interfaces/schemas/IUser";
 import { verifyToken } from "../../utils/verifyToken";
+import { IRefreshToken } from "../../interfaces/schemas/IRefreshToken";
+import { RefreshToken } from "../../models/RefreshToken";
 
 const router = express.Router();
 // Register
@@ -76,19 +78,16 @@ router.post("/login", async (req: Request, res: Response) => {
                 console.log(err);
             }
             if (response) {
-                const { expiresIn, accessToken, refreshToken } = signToken(user, user._id);
+                const { expiresIn, accessToken, refreshToken } = signToken(user._id);
 
-                if (refreshToken) {
-                    // save refreshToken in db
-                    user.refreshToken = refreshToken;
-                    user.save().then(user => {
-                        //console.log(user);
-                    }).catch(err => {
-                        console.log(err);
-                    });
-                    // set httpOnly cookie with refresh token
-                    setHttpOnlyCookie(res, refreshToken);
-                }
+                const newRefreshToken: IRefreshToken = new RefreshToken({
+                    token: refreshToken,
+                    user: user._id,
+                    createdAt: new Date(Date.now())
+                } as IRefreshToken);
+
+                setHttpOnlyCookie(res, refreshToken);
+                newRefreshToken.save();
                 const token = {
                     jwtToken: accessToken,
                     expiresIn: expiresIn
@@ -107,17 +106,7 @@ router.post("/login", async (req: Request, res: Response) => {
 
 router.get("/logout", async (req, res) => {
     const { jwt_token } = req.cookies;
-    const user: IUser | null = await User.findOne({ refreshToken: jwt_token }, (err, user) => {
-        if (user) {
-            user.set("refreshToken", null);
-            user.save().then().catch(err => {
-                console.log(err);
-            });
-        }
-        if (err) {
-            console.log(err);
-        }
-    });
+    const token: IRefreshToken | null = await RefreshToken.findOneAndDelete({ token: jwt_token });
     return res.send(<IResponse<string>>{ response: "Successfully logged out", status: EStatusCode.OK });
 });
 
@@ -126,54 +115,56 @@ router.get("/test", verifyToken, async (req, res) => {
     res.send("test");
 })
 
-// refresh access token
-router.get("/refresh_token/", async (req, res) => {
+router.get("/me", verifyToken, async (req, res) => {
     const { jwt_token } = req.cookies;
-    const user: IUser | null = await User.findOne({ refreshToken: jwt_token });
-    if (user) {
-        if (user.refreshToken === null) {
-            return res.send(401);
-        }
-        if (user.refreshToken === jwt_token) {
-            const { expiresIn, accessToken, refreshToken } = signToken(user, user._id);
+    const decoded: any = jwt.decode(jwt_token);
 
-            if (refreshToken) {
-                // save refreshToken in db
-                user.refreshToken = refreshToken;
-                user.save().then(user => {
-                    //console.log(user);
-                }).catch(err => {
-                    console.log(err);
-                });
-                // set httpOnly cookie with refresh token
-                setHttpOnlyCookie(res, refreshToken);
-            }
-
-            const token = {
-                jwtToken: accessToken,
-                expiresIn: expiresIn
-            }
-
-            return res.send(<IResponse<IUserResponse>>{ response: { user, token }, status: EStatusCode.OK });
+    if (decoded) {
+        const me: IUser | null = await User.findOne({ _id: decoded.id });
+        if (me) {
+            return res.send(<IResponse<IUserResponse>>{ response: { user: me }, status: EStatusCode.OK })
         } else {
             return res.send(<IResponse<IUserResponse>>{ response: { error: "Not able to authenticate" }, status: EStatusCode.FORBIDDEN });
         }
     } else {
         return res.send(<IResponse<IUserResponse>>{ response: { error: "Not able to authenticate" }, status: EStatusCode.FORBIDDEN });
     }
+})
+
+// refresh access token
+router.get("/refresh_token/", async (req, res) => {
+    const { jwt_token } = req.cookies;
+    const token: IRefreshToken | null = await RefreshToken.findOne({ token: jwt_token });
+    if (token) {
+        const { expiresIn, accessToken, refreshToken } = signToken(token.user);
+        // update old refresh token
+        token.token = refreshToken;
+        token.createdAt = new Date(Date.now())
+        token.save();
+        // set httpOnly cookie with refresh token
+        setHttpOnlyCookie(res, refreshToken);
+        // send access token to client
+        const clientAccessToken = {
+            jwtToken: accessToken,
+            expiresIn: expiresIn
+        }
+        return res.send(<IResponse<IUserResponse>>{ response: { token: clientAccessToken }, status: EStatusCode.OK });
+    } else {
+        return res.send(<IResponse<IUserResponse>>{ response: { error: "Not able to authenticate" }, status: EStatusCode.FORBIDDEN });
+    }
 });
 
-const signToken = (user: IUser, userId: string) => {
-    const expiresIn = 15;
+const signToken = (userId: string) => {
+    const expiresIn = 900;
     const accessToken = jwt.sign({ id: userId }, constants.ACCESS_TOKEN_SECRET, { expiresIn: expiresIn });
-    const refreshToken = jwt.sign({ id: userId }, constants.REFRESH_TOKEN_SECRET, { expiresIn: "30d" });
+    const refreshToken = jwt.sign({ id: userId }, constants.REFRESH_TOKEN_SECRET, { expiresIn: constants.REFRESH_TOKEN_EXPIRY_SECONDS });
     return { expiresIn, accessToken, refreshToken };
 }
 
 const setHttpOnlyCookie = (res: Response, refreshToken: string) => {
     // set httpOnly cookie with refresh token
     res.cookie("jwt_token", refreshToken, {
-        maxAge: 43200000,
+        maxAge: constants.REFRESH_TOKEN_EXPIRY_SECONDS * 1000,
         httpOnly: true,
         secure: false
     });

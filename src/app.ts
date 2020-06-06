@@ -34,7 +34,8 @@ app.use(function (req, res, next) {
 app.listen(constants.PORT, () => {
     mongoose.connect(constants.MONGO_URI, {
         useNewUrlParser: true,
-        useUnifiedTopology: true
+        useUnifiedTopology: true,
+        useCreateIndex: true
     });
 });
 

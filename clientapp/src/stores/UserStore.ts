@@ -40,9 +40,37 @@ class UserStore {
 
     }
 
+    public me = async () => {
+        if (getIsTokenExpired() || !this.token) {
+            await this.refreshToken();
+            console.log("token: ", this.token);
+            try {
+                const response = await axios.get<IResponse<IUserResponse>>("/auth/me", { headers: { Authorization: "Bearer " + this.token } });
+                if (response.data.status === EStatusCode.OK) {
+                    this.setUser(response.data.response.user);
+                }
+            } catch (err) {
+                console.log(err);
+                //todo: handle this somehow
+                //throw Error("Something went terribly wrong");
+            }
+        } else {
+            try {
+                const response = await axios.get<IResponse<IUserResponse>>("/auth/me", { headers: { Authorization: "Bearer " + this.token } });
+                if (response.data.status === EStatusCode.OK) {
+                    this.setUser(response.data.response.user);
+                }
+            } catch (err) {
+                console.log(err);
+                //todo: handle this somehow
+                //throw Error("Something went terribly wrong");
+            }
+        }
+    }
+
     public refreshToken = async () => {
         try {
-            const response = await axios.get<IResponse<IUserResponse>>("/auth/refresh_token/");
+            const response = await axios.get<IResponse<IUserResponse>>("/auth/refresh_token");
             if (response.data.status === EStatusCode.OK) {
                 this.setErrorText(undefined);
                 this.setToken(response.data.response.token?.jwtToken);

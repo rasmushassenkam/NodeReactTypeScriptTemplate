@@ -9,7 +9,7 @@ import { userStore } from "./stores/UserStore";
 import { Switch, Route } from "react-router-dom";
 
 export const App = observer(() => {
-	const { logoutUser, refreshToken } = userStore;
+	const { logoutUser, refreshToken, me } = userStore;
 
 	useEffect(() => {
 		const syncLogout = (event: StorageEvent) => {
@@ -26,7 +26,11 @@ export const App = observer(() => {
 
 	useEffect(() => {
 		refreshToken();
-	}, []);
+	}, [refreshToken]);
+
+	useEffect(() => {
+		me()
+	}, [me]);
 
 	return (
 		<div className="App">
